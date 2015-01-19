@@ -39,12 +39,13 @@ module RBFS
     end
   end
 
-  module HashSerializer
+  module HashSerialize
     def serialize_hash(hash)
       serialized_files = "#{hash.size}:"
 
       hash.each do |name, file|
-        serialized_files.concat("#{name}:#{file.serialize.length}:#{file.serialize}")
+        current_file = "#{name}:#{file.serialize.length}:#{file.serialize}"
+        serialized_files.concat(current_file)
       end
 
       serialized_files
@@ -57,8 +58,8 @@ module RBFS
       objects_count = objects_count.to_i
 
       objects_count.times do
-        object_name, object_length, serialized_string = serialized_string.split(':', 3)
-        object_content = serialized_string.slice!(0, object_length.to_i)
+        object_name, length, serialized_string = serialized_string.split(':', 3)
+        object_content = serialized_string.slice!(0, length.to_i)
 
         add_object_to_directory.call(object_name, object_content)
       end
@@ -68,7 +69,7 @@ module RBFS
   end
 
   class Directory
-    include HashSerializer
+    include HashSerialize
     extend  HashParser
 
     attr_reader :files, :directories
@@ -98,19 +99,19 @@ module RBFS
     end
 
     def self.parse(serialized_string)
-      new_directory = Directory.new()
+      directory = Directory.new()
 
       add_file = lambda do |file_name, file_content|
-                   new_directory.add_file(file_name, File.parse(file_content))
+                   directory.add_file(file_name, File.parse(file_content))
                  end
       serialized_string = parse_hash(serialized_string, &add_file)
 
-      add_directory = lambda do |dir_name, dir_content|
-                       new_directory.add_directory(dir_name, Directory.parse(dir_content))
+      add_directory = lambda do |name, content|
+                        directory.add_directory(name, Directory.parse(content))
                       end
       parse_hash(serialized_string, &add_directory)
 
-      new_directory
+      directory
     end
 
     private :serialize_hash
