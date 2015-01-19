@@ -1,69 +1,78 @@
-class String
-  def to_b
-    case self
-      when 'true'  then true
-      when 'false' then false
-    end
-  end
-end
-
 module RBFS
   class File
     attr_accessor :data
-    attr_reader   :data_type
 
     def initialize(passed_value = nil)
       self.data = passed_value
-      @data_type
     end
 
     def data=(passed_value)
-      @data      = passed_value
-      @data_type = define_data_type(passed_value)
+      @data = passed_value
     end
 
-    def define_data_type(data)
-      return :string  if data.is_a? String
-      return :symbol  if data.is_a? Symbol
-      return :number  if data.is_a? Integer   or data.is_a? Float
-      return :boolean if data.is_a? TrueClass or data.is_a? FalseClass
-      :nil
+    def data_type
+      case @data
+        when String                then :string
+        when Symbol                then :symbol
+        when Integer,   Float      then :number
+        when TrueClass, FalseClass then :boolean
+        when NilClass              then :nil
+      end
     end
 
     def serialize()
-      "#{@data_type}:#{@data}"
+      "#{data_type}:#{@data}"
     end
 
     def self.parse(serialized_string)
       serialized_data_type, serialized_data = serialized_string.split(':', 2)
 
-      parsed_data = parse_data(serialized_data, serialized_data_type)
-      parsed_file = File.new(parsed_data)
-    end
+      serialized_data = case serialized_data_type
+                          when 'string'  then serialized_data.to_s
+                          when 'symbol'  then serialized_data.to_sym
+                          when 'number'  then serialized_data.to_f
+                          when 'boolean' then serialized_data == 'true'
+                          else nil
+                        end
 
-    def self.parse_data(serialized_data, serialized_data_type)
-      case serialized_data_type
-        when 'string'  then serialized_data.to_s
-        when 'symbol'  then serialized_data.to_sym
-        when 'number'  then parse_number(serialized_data)
-        when 'boolean' then serialized_data.to_b
-        else nil
+      File.new(serialized_data)
+    end
+  end
+
+  module HashSerializer
+    def serialize_hash(hash)
+      serialized_files = "#{hash.size}:"
+
+      hash.each do |name, file|
+        serialized_files.concat("#{name}:#{file.serialize.length}:#{file.serialize}")
       end
-    end
 
-    def self.parse_number(serialized_data)
-      if serialized_data.include? '.'
-        serialized_data.to_f
-      else
-        serialized_data.to_i
+      serialized_files
+    end
+  end
+
+  module HashParser
+    def parse_hash(serialized_string, &add_object_to_directory)
+      objects_count, serialized_string = serialized_string.split(':', 2)
+      objects_count = objects_count.to_i
+
+      objects_count.times do
+        object_name, object_length, serialized_string = serialized_string.split(':', 3)
+        object_content = serialized_string.slice!(0, object_length.to_i)
+
+        add_object_to_directory.call(object_name, object_content)
       end
-    end
 
-    private :define_data_type
+      serialized_string
+    end
   end
 
   class Directory
+    include HashSerializer
+    extend  HashParser
+
     attr_reader :files, :directories
+
     def initialize()
       @files       = Hash.new
       @directories = Hash.new
@@ -88,20 +97,6 @@ module RBFS
       serialize_hash(@files) + serialize_hash(@directories)
     end
 
-    def serialize_hash(hash)
-      serialized_files = hash.size.to_s + ':'
-
-      hash.each do |name, file|
-        current_file = name.to_s                  + ':' +
-                       file.serialize.length.to_s + ':' +
-                       file.serialize
-
-        serialized_files.concat(current_file)
-      end
-
-      serialized_files
-    end
-
     def self.parse(serialized_string)
       new_directory = Directory.new()
 
@@ -118,20 +113,6 @@ module RBFS
       new_directory
     end
 
-    def self.parse_hash(serialized_string, &add_object_to_directory)
-      objects_count, serialized_string = serialized_string.split(':', 2)
-      objects_count = objects_count.to_i
-
-      objects_count.times do
-        object_name, object_length, serialized_string = serialized_string.split(':', 3)
-        object_content = serialized_string.slice!(0, object_length.to_i)
-
-        add_object_to_directory.(object_name, object_content)
-      end
-
-      serialized_string
-    end
-
-  private :serialize_hash
+    private :serialize_hash
   end
 end

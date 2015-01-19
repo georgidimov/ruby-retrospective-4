@@ -1,109 +1,67 @@
-module FilterOperators
-  def call(number)
-    @predicate.call(number)
-  end
-
-  def &(the_other_filter)
-    combined_filter = self.class.new(nil)
-
-    combined_filter.predicate = Proc.new do |number|
-      call(number) and the_other_filter.call(number)
-    end
-
-    combined_filter
-  end
-
-  def |(the_other_filter)
-    combined_filter = self.class.new(nil)
-
-    combined_filter.predicate = Proc.new do |number|
-      call(number) or the_other_filter.call(number)
-    end
-
-    combined_filter
-  end
-
-  def to_s
-    "#@predicate"
-  end
-end
-
 class NumberSet
   include Enumerable
-  attr_reader :container
 
-  def initialize
-    @container = []
+  def initialize(existing_set = [])
+    @set = existing_set
   end
 
-  def each
-    @container.each { |member| yield member }
+  def each(&block)
+    @set.each(&block)
   end
 
-  def <<(new_member)
-    @container << new_member if @container.find_index(new_member) == nil
-  end
-
-  def size
-    @container.size
-  end
-
-  def empty?
-    @container.empty?
+  def <<(new_number)
+    @set << new_number unless @set.include? new_number
   end
 
   def [](filter)
-    filtered_number_set = NumberSet.new
-
-    @container.each do |member|
-      filtered_number_set << member if filter.call(member)
-    end
-
-    filtered_number_set
+    NumberSet.new(@set.select { |number| filter.pass? number })
   end
 
-  def to_s
-    "#@container"
+  def size
+    @set.size
+  end
+
+  def empty?
+    @set.empty?
   end
 end
 
 class Filter
-  include FilterOperators
-  attr_accessor :predicate
-
   def initialize(&block)
-    @predicate = block
+    @condition = block
+  end
+
+  def pass?(number)
+    @condition.call(number)
+  end
+
+  def &(other_filter)
+    Filter.new { |number| pass? number and other_filter.pass? number }
+  end
+
+  def |(other_filter)
+    Filter.new { |number| pass? number or other_filter.pass? number }
   end
 end
 
-class TypeFilter
-  include FilterOperators
-  attr_accessor :predicate
-
-  def initialize(numbers_type)
-    case
-       when numbers_type == :integer
-         @predicate = Proc.new { |number|  number.is_a?(Integer) }
-       when numbers_type == :real
-         @predicate = Proc.new do |number| number.is_a?(Float) or
-                                           number.is_a?(Rational)
-         end
-       when numbers_type == :complex
-         @predicate = Proc.new { |number|  number.is_a?(Complex) }
-     end
+class TypeFilter < Filter
+  def initialize(type)
+    case type
+      when :integer then super() { |number| number.is_a? Integer }
+      when :real    then super() { |number| number.is_a? Float or
+                                            number.is_a? Rational }
+      when :complex then super() { |number| number.is_a? Complex }
+    end
   end
 end
 
-class SignFilter
-  include FilterOperators
-  attr_accessor :predicate
-
-  def initialize(numbers_limitation)
-    @predicate = case numbers_limitation
-                   when :positive     then Proc.new { |number| number > 0 }
-                   when :non_positive then Proc.new { |number| number <= 0 }
-                   when :negative     then Proc.new { |number| number < 0 }
-                   when :non_negative then Proc.new { |number| number >= 0 }
-                 end
+class SignFilter < Filter
+  def initialize(sign)
+    case sign
+      when :positive     then super() { |number| number > 0 }
+      when :non_positive then super() { |number| number <= 0 }
+      when :negative     then super() { |number| number < 0 }
+      when :non_negative then super() { |number| number >= 0 }
+    end
   end
 end

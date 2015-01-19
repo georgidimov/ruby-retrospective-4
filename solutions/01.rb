@@ -1,22 +1,25 @@
-def n_member(first, second, n)
-  #reduce n, because first and second members are already calculated
-  (n - 1).times { second, first = first + second, second }
+def fibonacci(nth_member)
+  return 1 if nth_member == 1 or nth_member == 2
 
-  first
+  fibonacci(nth_member - 1) + fibonacci(nth_member - 2)
 end
 
-def fibonacci(n)
-  n_member 1, 1, n
+def lucas(nth_member)
+  return 2 if nth_member == 1
+  return 1 if nth_member == 2
+
+  lucas(nth_member - 1) + lucas(nth_member - 2)
 end
 
-def lucas(n)
-  n_member 2, 1, n
+def summed(nth_member)
+  fibonacci(nth_member) + lucas(nth_member)
 end
 
-def series(sequence, n)
-  case sequence
-    when 'fibonacci' then fibonacci n
-    when 'lucas' then lucas n
-    when 'summed' then (fibonacci n) + (lucas n)
+def series(series_name, nth_member)
+  case series_name
+    when 'fibonacci' then fibonacci(nth_member)
+    when 'lucas'     then lucas(nth_member)
+    when 'summed'    then summed(nth_member)
   end
 end
+
